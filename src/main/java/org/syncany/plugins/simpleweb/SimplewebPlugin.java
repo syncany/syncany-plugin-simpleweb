@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.syncany.plugins.simple;
+package org.syncany.plugins.simpleweb;
 
 import static io.undertow.Handlers.resource;
 import io.undertow.server.HttpHandler;
@@ -27,14 +27,14 @@ import org.syncany.plugins.web.WebInterfacePlugin;
  * @author pheckel
  *
  */
-public class SimpleWebInterfacePlugin extends WebInterfacePlugin {
-	public SimpleWebInterfacePlugin() {
-		super("simple");
+public class SimplewebPlugin extends WebInterfacePlugin {
+	public SimplewebPlugin() {
+		super("simpleweb");
 	}
 
 	@Override
 	public HttpHandler createRequestHandler() {
-		return resource(new ClassPathResourceManager(SimpleWebInterfacePlugin.class.getClassLoader(), SimpleWebInterfacePlugin.class.getPackage()))
+		return resource(new ClassPathResourceManager(SimplewebPlugin.class.getClassLoader(), SimplewebPlugin.class.getPackage()))
 			.addWelcomeFiles("index.html")
 			.setDirectoryListingEnabled(true);
 	}
