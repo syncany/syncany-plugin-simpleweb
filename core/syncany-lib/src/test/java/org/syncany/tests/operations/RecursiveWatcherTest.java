@@ -130,11 +130,11 @@ public class RecursiveWatcherTest {
 		
 		// Start watcher and wait for watch service to set watch on all folders
 		watcher.start();		
-		Thread.sleep(150);
+		Thread.sleep(100);
 		
 		// Create sub folder AFTER watcher starts
 		subDir1.mkdir();
-		Thread.sleep(370);
+		Thread.sleep(350);
 		assertTrue(eventOccurred.get());
 		
 		eventOccurred.set(false);
