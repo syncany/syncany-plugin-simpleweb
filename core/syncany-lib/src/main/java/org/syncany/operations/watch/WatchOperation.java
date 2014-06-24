@@ -187,10 +187,6 @@ public class WatchOperation extends Operation implements NotificationListenerLis
 		
 		return new WatchOperationResult();
 	}
-	
-	public SqlDatabase getLocalDatabase() {
-		return localDatabase;
-	}
 
 	private void startRecursiveWatcher() {
 		logger.log(Level.INFO, "Starting recursive watcher for " + config.getLocalDir() + " ...");
