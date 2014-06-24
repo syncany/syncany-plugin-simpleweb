@@ -25,15 +25,21 @@ import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.syncany.config.Config;
 import org.syncany.config.ConfigException;
-import org.syncany.config.UserConfig;
+import org.syncany.config.ConfigHelper;
 import org.syncany.config.to.DaemonConfigTO;
 import org.syncany.config.to.FolderTO;
+import org.syncany.operations.daemon.messages.BadRequestResponse;
+import org.syncany.operations.daemon.messages.ListWatchesRequest;
+import org.syncany.operations.daemon.messages.ListWatchesResponse;
+import org.syncany.operations.daemon.messages.Request;
+import org.syncany.operations.daemon.messages.WatchRequest;
 import org.syncany.operations.watch.WatchOperation;
-import org.syncany.operations.watch.WatchOperationListener;
 import org.syncany.operations.watch.WatchOperationOptions;
 
 import com.google.common.collect.Maps;
+import com.google.common.eventbus.Subscribe;
 
 /**
  * The watch server can manage many different {@link WatchOperation}s. When started
@@ -43,26 +49,27 @@ import com.google.common.collect.Maps;
  * 
  * @author Philipp C. Heckel <philipp.heckel@gmail.com>
  */
-public class DaemonWatchServer implements WatchOperationListener {	
+public class DaemonWatchServer {	
 	private static final Logger logger = Logger.getLogger(DaemonWatchServer.class.getSimpleName());
-	private static final String DAEMON_FILE = "daemon.xml";
-	private static final String DEFAULT_FOLDER = "Syncany";
 	
 	private Map<File, WatchOperationThread> watchOperations;
+	private DaemonEventBus eventBus;
 	
 	public DaemonWatchServer() {
 		this.watchOperations = new TreeMap<File, WatchOperationThread>();
+		
+		this.eventBus = DaemonEventBus.getInstance();
+		this.eventBus.register(this);
 	}
 	
-	public void start() throws ConfigException {
-		logger.log(Level.INFO, "Starting watch server ... ");
-		reload();
+	public void start(DaemonConfigTO daemonConfigTO) {		
+		reload(daemonConfigTO);
 	}
 	
-	public void reload() {		
+	public void reload(DaemonConfigTO daemonConfigTO) {
+		logger.log(Level.INFO, "Starting/reloading watch server ... ");
+
 		try {
-			DaemonConfigTO daemonConfigTO = loadOrCreateConfig();
-			
 			Map<File, FolderTO> watchedFolders = getFolderMap(daemonConfigTO.getFolders());
 			Map<File, FolderTO> newWatchedFolderTOs = determineNewWatchedFolderTOs(watchedFolders);
 			List<File> removedWatchedFolderIds = determineRemovedWatchedFolderIds(watchedFolders);
@@ -96,12 +103,19 @@ public class DaemonWatchServer implements WatchOperationListener {
 			WatchOperationOptions watchOperationOptions = folderEntry.getValue().getWatchOptions();
 
 			try {	
-				logger.log(Level.INFO, "- Starting watch operation at " + localDir + " ...");
+				Config watchConfig = ConfigHelper.loadConfig(localDir);
 				
-				WatchOperationThread watchOperationThread = new WatchOperationThread(localDir, watchOperationOptions, this);	
-				watchOperationThread.start();
-
-				watchOperations.put(localDir, watchOperationThread);
+				if (watchConfig != null) {
+					logger.log(Level.INFO, "- Starting watch operation at " + localDir + " ...");					
+					
+					WatchOperationThread watchOperationThread = new WatchOperationThread(watchConfig, watchOperationOptions);	
+					watchOperationThread.start();
+	
+					watchOperations.put(localDir, watchOperationThread);
+				}
+				else {
+					logger.log(Level.INFO, "- CANNOT start watch, because no config found at " + localDir + " ...");										
+				}
 			}
 			catch (Exception e) {
 				logger.log(Level.SEVERE, "  + Cannot start watch operation at " + localDir + ". IGNORING.", e);
@@ -160,90 +174,26 @@ public class DaemonWatchServer implements WatchOperationListener {
 		
 		return removedWatchedFolderIds;
 	}
-
-	private DaemonConfigTO loadOrCreateConfig() throws ConfigException {
-		File configFile = new File(UserConfig.getUserConfigDir(), DAEMON_FILE);
-		
-		if (configFile.exists()) {
-			return loadConfig(configFile);
+	
+	@Subscribe
+	public void onRequestReceived(Request request) {
+		if (request instanceof ListWatchesRequest) {
+			processListWatchesRequest((ListWatchesRequest) request);
 		}
-		else {
-			return createAndWriteDefaultConfig(configFile);
+		else if (request instanceof WatchRequest) {
+			processWatchRequest((WatchRequest) request);
 		}
 	}
 
-	private DaemonConfigTO loadConfig(File configFile) throws ConfigException {
-		return DaemonConfigTO.load(configFile);
-	}
-
-	private DaemonConfigTO createAndWriteDefaultConfig(File configFile) {
-		File defaultFolder = new File(System.getProperty("user.home"), DEFAULT_FOLDER);
-		
-		FolderTO defaultFolderTO = new FolderTO();
-		defaultFolderTO.setPath(defaultFolder.getAbsolutePath());
-		
-		ArrayList<FolderTO> folders = new ArrayList<>();
-		folders.add(defaultFolderTO);
-		
-		DaemonConfigTO defaultDaemonConfigTO = new DaemonConfigTO();
-		defaultDaemonConfigTO.setFolders(folders);
-		
-		try {
-			DaemonConfigTO.save(defaultDaemonConfigTO, configFile);
-		}
-		catch (Exception e) {
-			// Don't care!
-		}
-		
-		return defaultDaemonConfigTO;
+	private void processListWatchesRequest(ListWatchesRequest request) {
+		eventBus.post(new ListWatchesResponse(request.getId(), new ArrayList<File>(watchOperations.keySet())));
 	}
 	
-	@Override
-	public void onUploadStart(int fileCount) {
-		// TODO Auto-generated method stub
+	private void processWatchRequest(WatchRequest watchRequest) {
+		File rootFolder = new File(watchRequest.getRoot());
 		
+		if (!watchOperations.containsKey(rootFolder)) {
+			eventBus.post(new BadRequestResponse(watchRequest.getId(), "Unknown root folder."));
+		}
 	}
-
-	@Override
-	public void onUploadFile(String fileName, int fileNumber) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void onIndexStart(int fileCount) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void onIndexFile(String fileName, int fileNumber) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void onDownloadStart(int fileCount) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void onDownloadFile(String fileName, int fileNumber) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void onUploadEnd() {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void onIndexEnd() {
-		// TODO Auto-generated method stub
-		
-	}
-
 }
