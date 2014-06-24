@@ -24,6 +24,7 @@ import java.util.Arrays;
 
 import org.junit.Test;
 import org.syncany.config.Logging;
+import org.syncany.connection.plugins.unreliable_local.UnreliableLocalConnection;
 import org.syncany.database.DatabaseConnectionFactory;
 import org.syncany.operations.cleanup.CleanupOperationOptions;
 import org.syncany.operations.cleanup.CleanupOperationResult;
@@ -35,7 +36,6 @@ import org.syncany.operations.up.UpOperationOptions;
 import org.syncany.operations.up.UpOperationResult;
 import org.syncany.operations.up.UpOperationResult.UpResultCode;
 import org.syncany.plugins.local.LocalConnection;
-import org.syncany.plugins.unreliable_local.UnreliableLocalConnection;
 import org.syncany.tests.util.TestAssertUtil;
 import org.syncany.tests.util.TestClient;
 import org.syncany.tests.util.TestConfigUtil;
