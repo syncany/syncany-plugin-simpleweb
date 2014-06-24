@@ -44,19 +44,19 @@ import org.syncany.config.UserConfig;
 public class DaemonControlServer implements TailerListener {	
 	private static final Logger logger = Logger.getLogger(DaemonControlServer.class.getSimpleName());
 	private static final String CONTROL_FILE = "daemon.ctrl";
-
-	public enum ControlCommand {
+	
+	private enum ControlCommand {
 		SHUTDOWN, RELOAD
 	}
 	
 	private File controlFile;
 	private Tailer controlFileTailer;
-	private DaemonEventBus eventBus;
+	private DaemonControlListener controlListener;
 
-	public DaemonControlServer() {
+	public DaemonControlServer(DaemonControlListener controlListener) {
 		this.controlFile = new File(UserConfig.getUserConfigDir(), CONTROL_FILE);
 		this.controlFileTailer = new Tailer(controlFile, this, 1000, true);
-		this.eventBus = DaemonEventBus.getInstance();		
+		this.controlListener = controlListener;
 	}
 
 	public void enterLoop() throws IOException, ServiceAlreadyStartedException {
@@ -70,7 +70,7 @@ public class DaemonControlServer implements TailerListener {
 		logger.log(Level.INFO, "Monitoring control file for commands at " + controlFile + " ...");
 		logger.log(Level.INFO, "   (Note: This is a blocking operation. The 'main' thread is now blocked until '" + ControlCommand.SHUTDOWN + "' is received.)");
 		
-		controlFileTailer.run(); // This blocks!
+		controlFileTailer.run(); 
 	}	
 
 	@Override
@@ -88,14 +88,13 @@ public class DaemonControlServer implements TailerListener {
 			case SHUTDOWN:
 				logger.log(Level.INFO, "Control file: Received shutdown command. Shutting down.");
 
-				eventBus.post(controlCommand);
+				controlListener.onDaemonShutdown();
 				controlFileTailer.stop();
 				break;
 				
 			case RELOAD:
 				logger.log(Level.INFO, "Control file: Received reload command. Reloading config ...");
-
-				eventBus.post(controlCommand);
+				controlListener.onDaemonReload();
 				break;
 				
 			default:

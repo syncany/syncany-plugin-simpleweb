@@ -19,22 +19,16 @@ package org.syncany.operations.daemon;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.syncany.config.Config;
 import org.syncany.config.ConfigException;
 import org.syncany.config.UserConfig;
-import org.syncany.config.to.DaemonConfigTO;
-import org.syncany.config.to.FolderTO;
 import org.syncany.operations.Operation;
 import org.syncany.operations.OperationResult;
-import org.syncany.operations.daemon.DaemonControlServer.ControlCommand;
 import org.syncany.operations.watch.WatchOperation;
 import org.syncany.util.PidFileUtil;
-
-import com.google.common.eventbus.Subscribe;
 
 /**
  * This operation is the central part of the daemon. It can manage many different
@@ -49,7 +43,7 @@ import com.google.common.eventbus.Subscribe;
  *  <li>The {@link DaemonWatchServer} starts a {@link WatchOperation} for every 
  *      folder registered in the <tt>daemon.xml</tt> file. It can be reloaded via
  *      the <tt>syd reload</tt> command.</li>
- *  <li>The {@link DaemonWebServer} starts a websocket and allows clients 
+ *  <li>The {@link DaemonWebSocketServer} starts a websocket and allows clients 
  *      (e.g. GUI, Web) to control the daemon (if authenticated). 
  *      TODO [medium] This is not yet implemented!</li>
  *  <li>The {@link DaemonControlServer} creates and watches the daemon control file
@@ -60,26 +54,18 @@ import com.google.common.eventbus.Subscribe;
  * @author Vincent Wiencek <vwiencek@gmail.com>
  * @author Philipp C. Heckel <philipp.heckel@gmail.com>
  */
-public class DaemonOperation extends Operation {	
+public class DaemonOperation extends Operation implements DaemonControlListener {	
 	private static final Logger logger = Logger.getLogger(DaemonOperation.class.getSimpleName());
 	private static final String PID_FILE = "daemon.pid";
-	private static final String DAEMON_FILE = "daemon.xml";
-	private static final String DEFAULT_FOLDER = "Syncany";
 
 	private File pidFile;
-	private File daemonConfigFile;
-	
-	private DaemonWebServer webServer;
+	private DaemonWebSocketServer webSocketServer;
 	private DaemonWatchServer watchServer;
 	private DaemonControlServer controlServer;
-	private DaemonEventBus eventBus;
-	private DaemonConfigTO daemonConfig;
 
 	public DaemonOperation(Config config) {
 		super(config);
-		
 		this.pidFile = new File(UserConfig.getUserConfigDir(), PID_FILE);
-		this.daemonConfigFile = new File(UserConfig.getUserConfigDir(), DAEMON_FILE);
 	}
 
 	@Override
@@ -97,48 +83,20 @@ public class DaemonOperation extends Operation {
 		
 		PidFileUtil.createPidFile(pidFile);
 		
-		initEventBus();		
-		loadOrCreateConfig();
-		
-		startWebServer();
+		// startWebSocketServer();
 		startWatchServer();
 		
-		enterControlLoop(); // This blocks until SHUTDOWN is received!
+		startDaemonControlLoop(); // This blocks until SHUTDOWN is received!
 	}
 	
-	@Subscribe
-	public void onControlCommand(ControlCommand controlCommand) {
-		switch (controlCommand) {
-		case SHUTDOWN:
-			logger.log(Level.INFO, "SHUTDOWN requested.");
-			stopOperation();
-			break;
-			
-		case RELOAD:
-			logger.log(Level.INFO, "RELOAD requested.");
-			reloadOperation();
-			break;
-		}
-	}
-	
-	private void initEventBus() {
-		eventBus = DaemonEventBus.getInstance();
-		eventBus.register(this);
-	}
-
 	private void stopOperation() {
-		stopWebSocketServer();
+		// stopWebSocketServer();
 		stopWatchServer();
 	}
 
 	private void stopWebSocketServer() {
-		if (webServer != null) {
-			logger.log(Level.INFO, "Stopping web server ...");
-			webServer.stop();
-		}
-		else {
-			logger.log(Level.INFO, "Not stopping web server (not running)");			
-		}
+		logger.log(Level.INFO, "Stopping websocket server ...");
+		webSocketServer.stop();
 	}
 
 	private void stopWatchServer() {
@@ -146,72 +104,36 @@ public class DaemonOperation extends Operation {
 		watchServer.stop();
 	}
 
-	private void startWebServer() throws ServiceAlreadyStartedException {
-		if (daemonConfig.getWebServer().isEnabled()) {
-			logger.log(Level.INFO, "Starting web server ...");
+	private void startWebSocketServer() throws ServiceAlreadyStartedException {
+		logger.log(Level.INFO, "Starting websocket server ...");
 
-			webServer = new DaemonWebServer(daemonConfig);
-			webServer.start();
-		}
-		else {
-			logger.log(Level.INFO, "Not starting web server (disabled in confi)");
-		}
+		webSocketServer = new DaemonWebSocketServer();
+		webSocketServer.start();
 	}
 
 	private void startWatchServer() throws ConfigException {
-		logger.log(Level.INFO, "Starting watch server ...");
+		logger.log(Level.INFO, "Starting websocket server ...");
 
 		watchServer = new DaemonWatchServer();
-		watchServer.start(daemonConfig);
+		watchServer.start();
 	}
 
-	private void enterControlLoop() throws IOException, ServiceAlreadyStartedException {
+	private void startDaemonControlLoop() throws IOException, ServiceAlreadyStartedException {
 		logger.log(Level.INFO, "Starting daemon control server ...");
 
-		controlServer = new DaemonControlServer();
+		controlServer = new DaemonControlServer(this);
 		controlServer.enterLoop(); // This blocks! 
 	}
-	
-	private void loadOrCreateConfig() {
-		try {
-			if (daemonConfigFile.exists()) {
-				daemonConfig = DaemonConfigTO.load(daemonConfigFile);
-			}
-			else {
-				daemonConfig = createAndWriteDefaultConfig(daemonConfigFile);
-			}
-		}
-		catch (Exception e) {
-			logger.log(Level.WARNING, "Cannot (re-)load config. Exception thrown.", e);
-		}
-	}
-	
-	private void reloadOperation() {
-		loadOrCreateConfig();
-		
-		watchServer.reload(daemonConfig);
-		// webServer.reload(daemonConfig); << Implement this
+
+	@Override
+	public void onDaemonShutdown() {
+		logger.log(Level.INFO, "SHUTDOWN requested.");
+		stopOperation();
 	}
 
-	private DaemonConfigTO createAndWriteDefaultConfig(File configFile) {
-		File defaultFolder = new File(System.getProperty("user.home"), DEFAULT_FOLDER);
-		
-		FolderTO defaultFolderTO = new FolderTO();
-		defaultFolderTO.setPath(defaultFolder.getAbsolutePath());
-		
-		ArrayList<FolderTO> folders = new ArrayList<>();
-		folders.add(defaultFolderTO);
-		
-		DaemonConfigTO defaultDaemonConfigTO = new DaemonConfigTO();
-		defaultDaemonConfigTO.setFolders(folders);
-		
-		try {
-			DaemonConfigTO.save(defaultDaemonConfigTO, configFile);
-		}
-		catch (Exception e) {
-			// Don't care!
-		}
-		
-		return defaultDaemonConfigTO;
+	@Override
+	public void onDaemonReload() {
+		logger.log(Level.INFO, "RELOAD requested.");
+		watchServer.reload();
 	}
 }
