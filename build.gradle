@@ -1,0 +1,34 @@
+apply plugin: 'java'
+apply plugin: 'eclipse'
+
+configurations {
+	pluginjar
+}
+
+project.ext {
+	pluginId = "simpleweb"
+	pluginName = "Simple Web"
+	pluginVersion = "0.1.6-alpha"	
+	pluginDate = new Date()
+	pluginAppMinVersion = "0.1.6-alpha"
+	pluginRelease = rootProject.ext.applicationRelease
+	
+	pluginVersionSnapshot = rootProject.ext.applicationVersionSnapshot
+	pluginVersionFull = "${pluginVersion}${pluginVersionSnapshot}"	
+}
+
+dependencies {
+	compile		project(':syncany-daemon')
+	compile		project(':syncany-lib')
+	compile		project(':syncany-util')
+	compile		project(':syncany-cli')	
+	
+	testCompile	project(path: ':syncany-daemon', configuration: 'tests')      
+	testCompile	project(path: ':syncany-lib', configuration: 'tests')      
+	testCompile	project(path: ':syncany-util', configuration: 'tests')
+	testCompile	project(path: ':syncany-cli', configuration: 'tests')      
+	testCompile	"junit:junit:4.9"	
+}
+
+apply from: 'core/gradle/gradle/plugins.jar.gradle'
+
