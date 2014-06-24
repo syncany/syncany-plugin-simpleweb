@@ -19,14 +19,9 @@ project.ext {
 
 dependencies {
 	compile		project(':syncany-daemon')
-	compile		project(':syncany-lib')
-	compile		project(':syncany-util')
-	compile		project(':syncany-cli')	
+	compile		"io.undertow:undertow-servlet:1.0.15.Final"
 	
-	testCompile	project(path: ':syncany-daemon', configuration: 'tests')      
-	testCompile	project(path: ':syncany-lib', configuration: 'tests')      
-	testCompile	project(path: ':syncany-util', configuration: 'tests')
-	testCompile	project(path: ':syncany-cli', configuration: 'tests')      
+	testCompile	project(path: ':syncany-daemon', configuration: 'tests')      	  
 	testCompile	"junit:junit:4.9"	
 }
 
