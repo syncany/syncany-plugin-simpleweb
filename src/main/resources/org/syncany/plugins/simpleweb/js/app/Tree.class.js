@@ -1,11 +1,11 @@
-function Tree(treeElements, onFileClick) {
+function Tree(treeElements, onFolderClick) {
 	var ROOT_NODE_ID = "ROOT";
 	var TREE_ID = "#" + treeElements[0].id;
 	
 	var lastNodeId = ROOT_NODE_ID;
 
 	this.init = function() {
-		var fireFileClick = this.fireFileClick;
+		var fireFolderClick = this.fireFolderClick;
 	
 		treeElements.jstree({
 			core: {
@@ -39,18 +39,18 @@ function Tree(treeElements, onFileClick) {
 				tree.load_node(data.node);
 			}
 			else {
-				fireFileClick(data);
+				fireFolderClick(data);
 			}
 		})
 	 	.on("load_node.jstree", function (e, data) {
 			console.log("load_node");
-			fireFileClick(data);			
+			fireFolderClick(data);			
 	 	});
 	 	
 	 	this.tree = $.jstree.reference(TREE_ID);
 	}
 	
-	this.fireFileClick = function(data) {
+	this.fireFolderClick = function(data) {
 		var nodeId = data.node.id;
 		var eventAlreadyFired = nodeId == lastNodeId;
 
@@ -58,7 +58,7 @@ function Tree(treeElements, onFileClick) {
 			lastNodeId = nodeId; 
 			
 			var file = (data.node.original) ? data.node.original.file : null;
-			onFileClick(file);
+			onFolderClick(file);
 		}
 	};
 	

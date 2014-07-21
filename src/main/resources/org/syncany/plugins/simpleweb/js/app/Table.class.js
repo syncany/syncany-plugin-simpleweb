@@ -1,4 +1,4 @@
-function Table(tableElements, onContextFileInfoClick, onContextPreviousVersionsClick) {
+function Table(tableElements, onContextFileInfoClick, onContextPreviousVersionsClick, onFileClick, onFolderClick) {
 	var dataTable = null;
 
 	this.populateTable = function(prefix, fileVersions) {
@@ -91,10 +91,10 @@ function Table(tableElements, onContextFileInfoClick, onContextPreviousVersionsC
 				}
 		
 				// Download
-				sendGetFileRequest(file);
+				onFileClick(file);
 			}
 			else {
-				sendFileTreeRequest(file.path+"/");
+				onFolderClick(file);
 			}
 		});
 
