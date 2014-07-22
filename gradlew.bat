@@ -1,0 +1,1 @@
+call core/gradlew.bat %*
