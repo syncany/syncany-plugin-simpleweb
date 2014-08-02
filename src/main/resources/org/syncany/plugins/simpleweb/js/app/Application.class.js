@@ -19,6 +19,8 @@ function Application() {
 	var tree = new Tree($('#tree'), onFolderClick);
 	var status = new Status($('#status'));
 	var table = new Table($('#table'), onContextFileInfoClick, onContextPreviousVersionsClick, onFileClick, onFolderClick);
+	
+	var wsReady = false;
 
 	$('#menu').selectric();
 		
@@ -46,11 +48,25 @@ function Application() {
 
 	function sendMessage(msg) {
 		console.log(msg);
-		websocket.send(msg);
+		waitForConnection(function() {
+			websocket.send(msg);
+			}, 1000);
+	}
+	
+	function waitForConnection(callback, interval) {
+	    if (wsReady) {
+	        callback();
+	    } else {
+	    	console.log("Waiting for ws connection readyState === 1." + websocket.readyState)
+	        setTimeout(function () {
+	            waitForConnection(callback, interval);
+	        },interval);
+	    }
 	}
 
 	function onOpen(evt) {
 		setGuiConnected(true);
+		wsReady = true;
 		status.okay("Connected");
 
 		sendListWatchesRequest();
