@@ -21,10 +21,10 @@ import org.simpleframework.xml.Element;
 
 public class WebServerTO {
 	@Element(required = false)
-	private boolean enabled = true;
+	private boolean enabled = false;
 	
 	@Element(required = false)
-	private int port = 8080;
+	private int port = 8443;
 	
 	@Element(required = false)
 	private String host = "localhost";
@@ -39,5 +39,9 @@ public class WebServerTO {
 
 	public String getHost() {
 		return host;
+	}
+	
+	public void setPort(int port) {
+		this.port = port;
 	}
 }
